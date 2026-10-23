@@ -1,0 +1,3 @@
+-r requirements-probe.txt
+transformers==4.57.1
+# Install torch==2.8.0+cpu separately from the official CPU wheel index.
