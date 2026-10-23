@@ -20,7 +20,32 @@ Open `http://127.0.0.1:8787`. Without `--model-dir`, the source-review and ledge
 flow works and excerpt ranking reports that the local model is not configured.
 Stop the server with Ctrl+C and use the same database path to resume saved cases.
 
-## Basic workflow
+## Fictional offline demonstration
+
+Use the explicit fixture option and a separate database to demonstrate state
+preservation without public-source requests, real products, or model files:
+
+```powershell
+& $python -B competitions/amazon-build-ship-shape2026/src/demo_server.py --db '.local\recall-handoff\synthetic-cases.sqlite' --port 8787 --demo-fixture competitions/amazon-build-ship-shape2026/preparation/synthetic-demo-v1.json
+```
+
+The permanent banner identifies fictional data. The sample is **Demo Manufacturer
+01 / Sample appliance 01 / SAMPLE-01**. Its example.invalid source is explicitly
+non-official; the source button shows the local fixture, not a fabricated official
+notice. Production mode still uses the strict HTTPS official-source validation.
+Synthetic and public-source cases cannot be resumed or changed in the other mode.
+
+Load the sample, confirm saving, record the first conditions check, and copy the
+review ID. Leave the review **REVIEW_OPEN**, stop the server with Ctrl+C, then
+restart using exactly the same command and database. Resume the same ID: the
+snapshot hash, first check and note remain; the next verification is still
+pending. Record that second fictional check, then optionally stop the review.
+Stopping a review closes it; interrupting the server while OPEN does not.
+This uses the real MCP tools and SQLite ledger. It establishes state persistence,
+not customer value, recall coverage, product safety, or model benefit. An optional
+installed model is separate from this core workflow.
+
+## Live public-source workflow
 
 ```bash
 python3 -m venv .local/recall-handoff/venv

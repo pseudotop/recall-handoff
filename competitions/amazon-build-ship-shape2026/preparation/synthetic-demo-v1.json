@@ -1,0 +1,18 @@
+{
+  "mode": "SYNTHETIC_DEMO",
+  "disclaimer": "Fictional demonstration only. No official recall, public-source search, owned product or manufacturer contact.",
+  "records": [
+    {
+      "RecallID": 1,
+      "RecallNumber": "DEMO-01",
+      "Title": "Demo Manufacturer 01 — Sample appliance 01",
+      "Description": "Fictional review exercise for Sample appliance 01, model SAMPLE-01. Compare the sample model and serial label, then record your own check. No real product is involved.",
+      "RecallDate": "2026-10-23",
+      "URL": "https://example.invalid/recall-handoff/synthetic-demo-v1",
+      "Manufacturers": [{"Name": "Demo Manufacturer 01"}],
+      "Products": [{"Name": "Sample appliance 01", "Model": "SAMPLE-01"}],
+      "Hazards": [{"Name": "Fictional condition used only to demonstrate a review checklist."}],
+      "Remedies": [{"Name": "Demo only: no remedy or real manufacturer action is available."}]
+    }
+  ]
+}

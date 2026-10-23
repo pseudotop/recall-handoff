@@ -3,17 +3,19 @@ from pathlib import Path
 import argparse
 from mcp.server.fastmcp import FastMCP
 from recall_handoff import Ledger, fetch_snapshot, candidates
+from demo_fixture import load_demo_fixture, demo_snapshot, require_case_mode
 
 
-def build_server(db_path, port=8765):
+def build_server(db_path, port=8765, demo_fixture=None):
     ledger = Ledger(db_path)
+    fixture = load_demo_fixture(demo_fixture) if demo_fixture is not None else None
     snapshots = {}
     server = FastMCP("Recall Handoff", host="127.0.0.1", port=port, stateless_http=True, json_response=True)
 
     @server.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
     def search_notices(brand: str, model: str = "") -> dict:
-        """Retrieve public CPSC candidates. Never returns a product-safety clearance."""
-        snapshot = fetch_snapshot(brand)
+        """Retrieve public-source candidates, or fictional candidates only in explicit demo mode. Never a safety clearance."""
+        snapshot = demo_snapshot(fixture, brand) if fixture is not None else fetch_snapshot(brand)
         key = snapshot["sha256"]
         snapshots[key] = snapshot
         while len(snapshots) > 16:
@@ -33,16 +35,18 @@ def build_server(db_path, port=8765):
     @server.tool(annotations={"readOnlyHint": True, "openWorldHint": False})
     def resume_case(case_id: str) -> dict:
         """Resume previously saved evidence and user-reported actions after a server restart."""
-        return ledger.load(case_id)
+        return require_case_mode(ledger.load(case_id), fixture is not None)
 
     @server.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
     def record_action(case_id: str, step: str, note: str, user_confirmed: bool = False) -> dict:
         """Record an action the USER performed; does not contact a manufacturer or apply for a refund."""
+        require_case_mode(ledger.load(case_id), fixture is not None)
         return ledger.advance(case_id, step, note, user_confirmed)
 
     @server.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
     def close_review(case_id: str, reason: str, note: str, user_confirmed: bool = False) -> dict:
         """Record user-reported NOT_AFFECTED, STOPPED or MANUFACTURER_UNRESOLVED without inventing a remedy request."""
+        require_case_mode(ledger.load(case_id), fixture is not None)
         return ledger.close(case_id, reason, note, user_confirmed)
 
     return server
@@ -52,5 +56,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--demo-fixture", type=Path, help="Explicit fictional offline input; no CPSC requests")
     args = parser.parse_args()
-    build_server(args.db, args.port).run(transport="streamable-http")
+    build_server(args.db, args.port, args.demo_fixture).run(transport="streamable-http")

@@ -10,8 +10,10 @@ import sys
 import threading
 import time
 from urllib.request import Request, ProxyHandler, build_opener
+from urllib.parse import parse_qs, urlsplit
 
 from local_assistant import LocalAssistant, MODEL_ID
+from demo_fixture import load_demo_fixture, DISCLAIMER
 
 TOOLS = {"search_notices", "save_case", "resume_case", "record_action", "close_review"}
 SOURCE = Path(__file__).resolve().parent
@@ -60,7 +62,7 @@ class MCPClient:
         return result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
 
-def handler(client, assistant, token):
+def handler(client, assistant, token, fixture=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -81,11 +83,32 @@ def handler(client, assistant, token):
         def do_GET(self):
             if not self.valid_host(): return self.send(403, {"error": "Invalid local host"})
             if self.path == "/":
-                page = (SOURCE / "ui.html").read_text().replace("__LOCAL_TOKEN__", json.dumps(token))
+                page = (SOURCE / "ui.html").read_text(encoding="utf-8").replace("__LOCAL_TOKEN__", json.dumps(token))
+                page = page.replace("__DEMO_MODE__", json.dumps(fixture is not None))
+                page = page.replace("__MODE_BANNER__", DISCLAIMER if fixture is not None else "Live public-source mode — results require product verification.")
+                if fixture is not None:
+                    page = page.replace('value="Anker"', 'value="Demo Manufacturer 01"').replace('value="A1647"', 'value="SAMPLE-01"')
+                    page = page.replace("Search CPSC notices", "Load fictional sample")
+                    page = page.replace("Find an official notice", "Load a fictional sample")
+                    page = page.replace("official notice", "fictional sample").replace("official source", "fictional source")
+                    page = page.replace("CPSC coverage and notice conditions vary.", "This is an offline fictional exercise.")
+                    page = page.replace("This frontend demonstrates the workflow without an Alexa connection.", "A real local tool server stores the review; the model is optional.")
                 return self.send(200, page, "text/html; charset=utf-8")
+            if self.path == "/demo-source" and fixture is not None:
+                return self.send(200, fixture)
+            if urlsplit(self.path).path == "/demo-source" and fixture is not None:
+                try:
+                    query = parse_qs(urlsplit(self.path).query)
+                    if set(query) != {"case_id"} or len(query["case_id"]) != 1:
+                        raise ValueError("Choose one saved fictional review")
+                    case = client.call("resume_case", {"case_id": query["case_id"][0]})
+                    return self.send(200, {**case["snapshot"], "records": [case["notice"]]})
+                except (OSError, ValueError, TypeError, KeyError) as error:
+                    return self.send(400, {"error": str(error)[:400]})
             if self.path == "/api/config":
                 return self.send(200, {"model_available": assistant is not None,
-                                      "model_id": MODEL_ID if assistant else None, "mcp": "CONNECTED"})
+                                      "model_id": MODEL_ID if assistant else None, "mcp": "CONNECTED",
+                                      "source_mode": "SYNTHETIC_DEMO" if fixture is not None else "LIVE_PUBLIC_QUERY"})
             self.send(404, {"error": "Not found"})
 
         def do_POST(self):
@@ -116,13 +139,17 @@ def main():
     parser.add_argument("--db", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--model-dir", type=Path)
+    parser.add_argument("--demo-fixture", type=Path, help="Explicit fictional offline input; no CPSC requests")
     args = parser.parse_args()
+    fixture = load_demo_fixture(args.demo_fixture) if args.demo_fixture else None
     args.db.parent.mkdir(parents=True, exist_ok=True)
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0)); mcp_port = probe.getsockname()[1]
     with args.db.with_suffix(".mcp.log").open("a") as log:
-        process = subprocess.Popen([sys.executable, str(SOURCE / "mcp_server.py"), "--db", str(args.db),
-                                    "--port", str(mcp_port)], stdout=log, stderr=log)
+        command = [sys.executable, str(SOURCE / "mcp_server.py"), "--db", str(args.db), "--port", str(mcp_port)]
+        if args.demo_fixture:
+            command.extend(["--demo-fixture", str(args.demo_fixture)])
+        process = subprocess.Popen(command, stdout=log, stderr=log)
         try:
             client = MCPClient(mcp_port); deadline = time.monotonic() + 25
             while True:
@@ -133,7 +160,7 @@ def main():
                         raise RuntimeError("The local MCP server did not start; inspect its log")
                     time.sleep(.1)
             assistant = LocalAssistant(args.model_dir) if args.model_dir else None
-            server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(client, assistant, secrets.token_urlsafe(24)))
+            server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(client, assistant, secrets.token_urlsafe(24), fixture))
             print(json.dumps({"url": f"http://127.0.0.1:{server.server_port}", "model": assistant is not None}), flush=True)
             try: server.serve_forever()
             except KeyboardInterrupt: pass
