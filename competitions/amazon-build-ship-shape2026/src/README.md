@@ -60,7 +60,7 @@ Open `http://127.0.0.1:8787`. Search a brand/model, inspect the full manufacture
 The model is approximately 1GB of additional files; PyTorch and its environment need more disk/memory. It was run on Linux CPU. The restore script verifies the fixed revision and all nine file sizes/SHA-256 values. Model files and installed libraries stay under `.local`.
 
 ```bash
-.local/recall-handoff/venv/bin/python -m pip install 'torch==2.8.0+cpu' --index-url https://download.pytorch.org/whl/cpu
+.local/recall-handoff/venv/bin/python -m pip install 'torch==2.14.1+cpu' --index-url https://download.pytorch.org/whl/cpu
 .local/recall-handoff/venv/bin/python -m pip install -r competitions/amazon-build-ship-shape2026/preparation/requirements-model.txt
 .local/recall-handoff/venv/bin/python competitions/amazon-build-ship-shape2026/preparation/setup_local_model.py --output-dir .local/recall-handoff/model
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .local/recall-handoff/venv/bin/python competitions/amazon-build-ship-shape2026/src/demo_server.py --db .local/recall-handoff/cases.sqlite --model-dir .local/recall-handoff/model --port 8787

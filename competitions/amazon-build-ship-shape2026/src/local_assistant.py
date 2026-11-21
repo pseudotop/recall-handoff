@@ -86,7 +86,9 @@ class LocalAssistant:
         ]
         started = time.monotonic()
         with self.lock, torch.inference_mode():
-            inputs = self.tokenizer.apply_chat_template(prompt, tokenize=True, add_generation_prompt=True, return_tensors="pt")
+            # Transformers 5 returns a mapping by default; ask for one explicitly so 4.x and 5.x agree.
+            inputs = self.tokenizer.apply_chat_template(prompt, tokenize=True, add_generation_prompt=True,
+                                                        return_tensors="pt", return_dict=True)["input_ids"]
             if inputs.shape[-1] > 4096:
                 return {"status": "INPUT_LIMIT", "product_safety_determination": "NOT_MADE"}
             tokens = [self.tokenizer.encode(label, add_special_tokens=False) for label in labels]
